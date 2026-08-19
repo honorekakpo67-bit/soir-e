@@ -1,0 +1,82 @@
+/* @import url() FONT IMPORTS MUST ALWAYS BE AT THE VERY TOP OF THIS FILE, ABOVE THE TAILWIND IMPORTS — DO NOT DELETE THIS COMMENT */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* CRITICAL: THE FOLLOWING TAILWIND IMPORTS MUST NEVER BE DELETED OR REORDERED — DO NOT DELETE THIS COMMENT */
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* END TAILWIND IMPORTS — ALL OTHER CSS MUST GO BELOW THIS LINE */
+
+:root {
+  color-scheme: dark;
+}
+html,
+body,
+#root {
+  min-height: 100%;
+  width: 100%;
+}
+body {
+  background-color: #0b0616;
+  color: #f6f2ff;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+::selection {
+  background: rgba(255, 122, 89, 0.35);
+}
+.glass {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.glass-strong {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(26px);
+  -webkit-backdrop-filter: blur(26px);
+}
+.glass-light {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(17, 6, 34, 0.06);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.text-gradient {
+  background-image: linear-gradient(100deg, #a855f7 0%, #ec4899 45%, #fb923c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.brand-gradient {
+  background-image: linear-gradient(100deg, #7c3aed 0%, #ec4899 50%, #fb923c 100%);
+}
+.aurora {
+  background:
+    radial-gradient(60rem 40rem at 12% -10%, rgba(124, 58, 237, 0.5), transparent 60%),
+    radial-gradient(50rem 34rem at 92% 6%, rgba(236, 72, 153, 0.42), transparent 62%),
+    radial-gradient(46rem 34rem at 50% 108%, rgba(251, 146, 60, 0.34), transparent 60%);
+}
+.ticket-notch {
+  -webkit-mask-image: radial-gradient(circle at 0 50%, transparent 14px, #000 15px),
+    radial-gradient(circle at 100% 50%, transparent 14px, #000 15px);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+*:focus-visible {
+  outline: 2px solid #fb923c;
+  outline-offset: 2px;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+}
