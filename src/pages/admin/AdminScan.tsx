@@ -49,6 +49,7 @@ export function AdminScan() {
   const upcoming = events.filter((event) => event.published);
   const [eventId, setEventId] = useState<string>('all');
   const [scanning, setScanning] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [manual, setManual] = useState('');
   const [result, setResult] = useState<ScanResult | null>(null);
@@ -58,12 +59,14 @@ export function AdminScan() {
 
   const handleCode = useCallback(
     (code: string) => {
+      console.log('QR Code received:', code);
       if (lockRef.current === code) return;
       lockRef.current = code;
       window.setTimeout(() => {
         lockRef.current = '';
       }, 2500);
       const outcome = scanCode(code, eventId === 'all' ? undefined : eventId);
+      console.log('Scan outcome:', outcome);
       setResult(outcome);
       setHistory((prev) => [outcome, ...prev].slice(0, 12));
       if (navigator.vibrate) navigator.vibrate(outcome.outcome === 'valid' ? 60 : [40, 60, 40]);
@@ -87,23 +90,77 @@ export function AdminScan() {
       /* déjà arrêté */}
     scannerRef.current = null;
     setScanning(false);
+    setStarting(false);
   }, []);
 
   const startCamera = useCallback(async () => {
     setCameraError('');
+    setStarting(true);
     try {
-      const scanner = new Html5Qrcode(READER_ID, { verbose: false });
+      const readerElement = document.getElementById(READER_ID);
+      if (!readerElement) {
+        throw new Error('Élément lecteur non trouvé');
+      }
+
+      const permissions = await navigator.permissions.query({ name: 'camera' as PermissionName });
+      if (permissions.state === 'denied') {
+        setCameraError("L'accès à la caméra est bloqué. Changez les permissions dans les paramètres du navigateur.");
+        setStarting(false);
+        return;
+      }
+
+      const scanner = new Html5Qrcode(READER_ID, { verbose: true });
       scannerRef.current = scanner;
-      await scanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 240, height: 240 } },
-        (decoded) => handleCodeRef.current(decoded),
-        () => undefined
-      );
-      setScanning(true);
-    } catch {
+
+      const startScan = async () => {
+        try {
+          await scanner.start(
+            { facingMode: 'environment' },
+            {
+              fps: 15,
+              qrbox: { width: 280, height: 280 },
+              aspectRatio: 1.0,
+              disableFlip: true,
+              videoConstraints: {
+                facingMode: { exact: 'environment' },
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+              }
+            },
+            (decodedText, decodedResult) => {
+              console.log('QR Code detected:', decodedText, decodedResult);
+              handleCodeRef.current(decodedText);
+            },
+            (error) => {
+              console.debug('QR scan error:', error);
+            }
+          );
+          setScanning(true);
+          setStarting(false);
+        } catch (startErr) {
+          console.error('Failed to start scanner:', startErr);
+          try {
+            await scanner.start(
+              { facingMode: 'environment' },
+              { fps: 15, qrbox: { width: 280, height: 280 } },
+              (decodedText) => handleCodeRef.current(decodedText),
+              () => undefined
+            );
+            setScanning(true);
+            setStarting(false);
+          } catch (fallbackErr) {
+            console.error('Fallback start failed:', fallbackErr);
+            throw fallbackErr;
+          }
+        }
+      };
+
+      await startScan();
+    } catch (err) {
+      console.error('Failed to start camera:', err);
       scannerRef.current = null;
       setScanning(false);
+      setStarting(false);
       setCameraError(
         "Impossible d'accéder à la caméra. Autorise l'accès dans le navigateur ou saisis le code à la main."
       );
@@ -158,7 +215,16 @@ export function AdminScan() {
           <div className="relative mx-auto aspect-square w-full max-w-md overflow-hidden rounded-3xl bg-night-800">
             <div id={READER_ID} className="h-full w-full [&_video]:h-full [&_video]:w-full [&_video]:object-cover" />
 
-            {!scanning ?
+{starting ?
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
+                <span className="relative flex h-20 w-20 items-center justify-center rounded-full bg-white/10">
+                  <span className="absolute inset-0 animate-spin rounded-full border-4 border-blush/60 border-t-transparent" />
+                  <CameraIcon className="h-8 w-8 text-white/70" />
+                </span>
+                <p className="text-sm text-white/55">
+                  Démarrage de la caméra...
+                </p>
+              </div> : !scanning ?
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
                 <span className="relative flex h-20 w-20 items-center justify-center rounded-full bg-white/10">
                   <span className="absolute inset-0 animate-pulse-ring rounded-full border border-blush/60" />
@@ -179,14 +245,14 @@ export function AdminScan() {
                     className="absolute inset-x-2 h-0.5 rounded-full bg-sunset shadow-glow"
                     animate={{ top: ['6%', '92%', '6%'] }}
                     transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }} />
-                  
+                   
                   </div>
                 </div>
                 <button
                 type="button"
                 onClick={stopCamera}
                 className="absolute bottom-4 left-1/2 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-night-900/85 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-md">
-                
+                 
                   <CameraOffIcon className="h-4 w-4" /> Arrêter
                 </button>
               </>
