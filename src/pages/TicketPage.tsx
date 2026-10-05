@@ -105,12 +105,10 @@ export function TicketPage() {
               <img
                 src={qr}
                 alt={`QR code du billet ${ticket.code}`}
-                className={`h-56 w-56 sm:h-72 sm:w-72 ${used ? 'opacity-30 grayscale' : ''}`} /> :
-
-
-              <div className="h-56 w-56 animate-pulse rounded-xl bg-night-900/10 sm:h-72 sm:w-72" />
-              }
-              {used ?
+                className={`h-[250px] w-[250px] ${used ? 'opacity-30 grayscale' : ''}`} /> :
+              <div className="h-[250px] w-[250px] animate-pulse rounded-xl bg-night-900/10" />
+            }
+            {used ?
               <span className="absolute inset-0 flex items-center justify-center">
                   <span className="-rotate-12 rounded-xl border-4 border-red-500/70 px-5 py-2 font-display text-2xl font-extrabold uppercase tracking-widest text-red-500/80">
                     Déjà utilisé
