@@ -9,6 +9,7 @@ import { EventDetail } from './pages/EventDetail';
 import { Checkout } from './pages/Checkout';
 import { PaymentReturn } from './pages/PaymentReturn';
 import { TicketPage } from './pages/TicketPage';
+import { ScanPage } from './pages/ScanPage';
 import { AdminLogin } from './pages/admin/AdminLogin';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminEvents } from './pages/admin/AdminEvents';
@@ -45,6 +46,7 @@ export function App() {
             <Route path="/paiement/:eventId" element={<Checkout />} />
             <Route path="/paiement/:eventId/retour" element={<PaymentReturn />} />
             <Route path="/billet/:code" element={<TicketPage />} />
+            <Route path="/scan" element={<ScanPage />} />
           </Route>
 
           <Route path="/admin/login" element={<AdminLogin />} />

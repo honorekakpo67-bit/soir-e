@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { CheckCircle2Icon, AlertTriangleIcon, XCircleIcon, CameraIcon, CameraOffIcon, ScanLineIcon, Loader2Icon, KeyboardIcon } from 'lucide-react';
+import { CheckCircle2Icon, AlertTriangleIcon, XCircleIcon, CameraIcon, CameraOffIcon, ScanLineIcon, Loader2Icon, KeyboardIcon, ChevronDownIcon } from 'lucide-react';
+import { useApp } from '../contexts/AppContext';
 
 const READER_ID = 'qr-reader-main';
 
@@ -24,11 +25,6 @@ const outcomeStyles = {
     title: 'Mauvais événement',
     className: 'border-red-400/40 bg-red-500/15 text-red-100',
     icon: XCircleIcon
-  },
-  'network-error': {
-    title: 'Erreur réseau',
-    className: 'border-red-400/40 bg-red-500/15 text-red-100',
-    icon: XCircleIcon
   }
 };
 
@@ -36,9 +32,10 @@ const outcomeStyles = {
  * QRScanner - A reusable QR code scanner component
  * Uses html5-qrcode for reliable scanning
  * Forces rear camera and handles all error states
- * Sends scanned codes to backend API for validation
+ * Validates codes locally using AppContext (no backend needed)
  */
-export function QRScanner({ onScanResult, apiEndpoint = '/api/validate-ticket', eventId }) {
+export function QRScanner({ onScanResult, eventId: propEventId }) {
+  const { scanCode, events } = useApp();
   const [scanning, setScanning] = useState(false);
   const [starting, setStarting] = useState(false);
   const [cameraError, setCameraError] = useState('');
@@ -46,6 +43,7 @@ export function QRScanner({ onScanResult, apiEndpoint = '/api/validate-ticket', 
   const [showResult, setShowResult] = useState(false);
   const [availableCameras, setAvailableCameras] = useState([]);
   const [selectedCameraId, setSelectedCameraId] = useState(null);
+  const [eventId, setEventId] = useState(propEventId || 'all');
   const scannerRef = useRef(null);
   const lockRef = useRef('');
   const isMountedRef = useRef(true);
@@ -94,7 +92,14 @@ export function QRScanner({ onScanResult, apiEndpoint = '/api/validate-ticket', 
     loadCameras();
   }, [loadCameras]);
 
-  const handleCode = useCallback(async (code) => {
+  // Sync eventId from prop
+  useEffect(() => {
+    if (propEventId) {
+      setEventId(propEventId);
+    }
+  }, [propEventId]);
+
+  const handleCode = useCallback((code) => {
     if (lockRef.current === code) return;
     lockRef.current = code;
     
@@ -103,71 +108,24 @@ export function QRScanner({ onScanResult, apiEndpoint = '/api/validate-ticket', 
       lockRef.current = '';
     }, 2500);
 
-    // Show loading state
-    setResult({ outcome: 'loading', code, at: new Date().toISOString() });
+    // Validate locally using AppContext scanCode
+    const scanResult = scanCode(code, eventId === 'all' ? undefined : eventId);
+    
+    if (!isMountedRef.current) return;
+    
+    setResult(scanResult);
     setShowResult(true);
-
-    try {
-      // Send to backend API
-      const response = await fetch(apiEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ code, eventId }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (!isMountedRef.current) return;
-
-      // Map backend response to outcome
-      let outcome;
-      if (data.valid) {
-        outcome = 'valid';
-      } else if (data.alreadyUsed) {
-        outcome = 'already-used';
-      } else if (data.wrongEvent) {
-        outcome = 'wrong-event';
-      } else {
-        outcome = 'not-found';
-      }
-
-      const scanResult = {
-        outcome,
-        code,
-        ticket: data.ticket,
-        event: data.event,
-        at: new Date().toISOString()
-      };
-
-      setResult(scanResult);
-      
-      // Call optional callback
-      if (onScanResult) {
-        onScanResult(scanResult);
-      }
-
-      // Vibrate on mobile for feedback
-      if (navigator.vibrate) {
-        navigator.vibrate(outcome === 'valid' ? 60 : [40, 60, 40]);
-      }
-    } catch (err) {
-      console.error('Scan validation error:', err);
-      if (!isMountedRef.current) return;
-      
-      setResult({
-        outcome: 'network-error',
-        code,
-        error: err.message,
-        at: new Date().toISOString()
-      });
+    
+    // Call optional callback
+    if (onScanResult) {
+      onScanResult(scanResult);
     }
-  }, [apiEndpoint, eventId, onScanResult]);
+
+    // Vibrate on mobile for feedback
+    if (navigator.vibrate) {
+      navigator.vibrate(scanResult.outcome === 'valid' ? 60 : [40, 60, 40]);
+    }
+  }, [eventId, onScanResult, scanCode]);
 
   const handleCodeRef = useRef(handleCode);
   useEffect(() => {
@@ -295,6 +253,9 @@ export function QRScanner({ onScanResult, apiEndpoint = '/api/validate-ticket', 
     }
   }, []);
 
+  // Filter published events for dropdown
+  const publishedEvents = events.filter((e) => e.published);
+
   // Render result overlay
   if (showResult && result) {
     const style = outcomeStyles[result.outcome] || outcomeStyles['not-found'];
@@ -308,6 +269,23 @@ export function QRScanner({ onScanResult, apiEndpoint = '/api/validate-ticket', 
             <p className="mt-1 text-sm text-white/50">
               Chaque QR code n'est validable qu'une seule fois
             </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="event-select" className="text-sm text-white/50">Événement :</label>
+            <select
+              id="event-select"
+              value={eventId}
+              onChange={(e) => setEventId(e.target.value)}
+              className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white focus:border-blush/50 focus:outline-none appearance-none pr-8"
+            >
+              <option value="all" className="bg-night-800">Tous les événements</option>
+              {publishedEvents.map((event) => (
+                <option key={event.id} value={event.id} className="bg-night-800">
+                  {event.title}
+                </option>
+              ))}
+            </select>
+            <ChevronDownIcon className="absolute right-3 h-4 w-4 text-white/40 pointer-events-none" />
           </div>
         </header>
 
@@ -399,21 +377,42 @@ export function QRScanner({ onScanResult, apiEndpoint = '/api/validate-ticket', 
             Chaque QR code n'est validable qu'une seule fois
           </p>
         </div>
-        {availableCameras.length > 1 && (
-          <select
-            value={selectedCameraId || ''}
-            onChange={(e) => setSelectedCameraId(e.target.value || null)}
-            aria-label="Choisir la caméra"
-            className="self-start rounded-full border border-white/15 bg-white/5 px-4 py-3 text-sm text-white focus:border-blush/50 focus:outline-none"
-          >
-            <option value="" className="bg-night-800">Caméra automatique</option>
-            {availableCameras.map((cam) => (
-              <option key={cam.id} value={cam.id} className="bg-night-800">
-                {cam.label}
-              </option>
-            ))}
-          </select>
-        )}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {availableCameras.length > 1 && (
+            <select
+              value={selectedCameraId || ''}
+              onChange={(e) => setSelectedCameraId(e.target.value || null)}
+              aria-label="Choisir la caméra"
+              className="self-start rounded-full border border-white/15 bg-white/5 px-4 py-3 text-sm text-white focus:border-blush/50 focus:outline-none"
+            >
+              <option value="" className="bg-night-800">Caméra automatique</option>
+              {availableCameras.map((cam) => (
+                <option key={cam.id} value={cam.id} className="bg-night-800">
+                  {cam.label}
+                </option>
+              ))}
+            </select>
+          )}
+          <div className="flex items-center gap-2">
+            <label htmlFor="event-select-scanner" className="text-sm text-white/50">Événement :</label>
+            <div className="relative">
+              <select
+                id="event-select-scanner"
+                value={eventId}
+                onChange={(e) => setEventId(e.target.value)}
+                className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white focus:border-blush/50 focus:outline-none appearance-none pr-8"
+              >
+                <option value="all" className="bg-night-800">Tous les événements</option>
+                {publishedEvents.map((event) => (
+                  <option key={event.id} value={event.id} className="bg-night-800">
+                    {event.title}
+                  </option>
+                ))}
+              </select>
+              <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 pointer-events-none" />
+            </div>
+          </div>
+        </div>
       </header>
 
       <div className="grid gap-5 lg:grid-cols-[1fr_0.85fr]">
@@ -540,5 +539,7 @@ function Button({ children, onClick, variant = 'primary', className = '', disabl
     </button>
   );
 }
+
+import { motion } from 'framer-motion';
 
 export default QRScanner;
